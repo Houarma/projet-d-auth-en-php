@@ -1,99 +1,46 @@
 <?php 
+	//debut de la session
+	session_start();
+
+	//connexion a la bdd
 	require_once("src/connexion.php");
+	
+	//introduction des classe correspondantes
+	spl_autoload_register(function ($classe)  {
+		require_once('classes/'.$classe.'.php');
+	});
+	
 	//detection du form
 	if (!empty($_POST["pseudo"]) && !empty($_POST["password"]) && !empty($_POST["email"])) {
-		$speudo=htmlspecialchars($_POST["pseudo"]);
+		$pseudo=htmlspecialchars($_POST["pseudo"]);
 		$email=htmlspecialchars($_POST["email"]);
 		$password=htmlspecialchars($_POST["password"]);
 		$secret=time().rand().rand();
+
+		//verification de l email
+		if (!Inscription::syntaxeEmail($email)) {
+			header("location:index.php?error=true&message=votre email n est pas valide");
+			exit();
+		}
+
+		//verification des doublons
+		if (Inscription::doublonEmail($email,$bdd)) {
+			header("location:index.php?error=true&message=cette adresse mail existe deja ");
+			exit();
+		}
+
+		//chiffrement du mot de passe
+		$password=Inscription::chiffer($password);
+		
+		//add users
+		$user= new User($pseudo,$email,$password,$secret);
+		$user->enregistrer($bdd);
+		$user->creerLesSessions();
+		// redirection 
+		header("location:index.php?success=true");
+		exit();
 		
 	}
-	class Inscription{
-		//methodes statics 
-		public static function chiffer($password){
-			return "aq1".sha1($password."123")."125";
-		}
-		public static function syntaxeEmail($email){
-			if (!filter_var($email,FILTER_VALIDATE_EMAIL)) {
-				return false;
-			}
-			else{
-				return true;
-			}
-		}
-		public static function doublonEmail($email){
-			$emailInfo=$bdd->prepare("SELECT COUNT(*) AS emailNumber FROM users WHERE email=:email");
-			$emailInfo->execute([
-				"email"=>$email
-			]);
-			while ($userMail=$emailInfo->fetch()) {
-				if ($userMail["email"]!=0) {
-					return true;
-				}
-				else{
-					return false;
-				}
-			}
-		}
-	}
-	class User{
-		//attributs
-		private $_pseudo;
-		private $_email;
-		private $_password;
-		private $_secret;
-		//constructeur
-		public function __construct($pseudo,$email,$password){
-			$this->setPseudo($pseudo);
-			$this->setEmail($email);
-			$this->setPassword($password);
-		}
-		//getters
-		public function getPseudo(){
-			return $this->_pseudo;
-		}
-		public function getEmail(){
-			return $this->_email;
-		}
-		public function getPassword(){
-			return $this->_password;
-		}
-		public function getSecret(){
-			return $this->_secret;
-		}
-		//setters
-		public function setPseudo($newPseudo){
-			$this->_pseudo=$newPseudo;
-		}
-		public function setEmail($newEmail){
-			$this->_email=$newEmail;
-		}
-		public function setPassword($newPassword){
-			$this->_password=$newPassword;
-		}
-		//methodes
-		public function enregistrer(){
-			
-			$request=$bdd->prepare("INSERT INTO users(pseudo,email,password,secret) VALUES(:pseudo,:email,:password,:secret)");
-			$request->execute([
-				"pseudo"=>$this->getPseudo();
-				"email"=>$this->getEmail();
-				"pasword"=>$this->getPassword();
-				"secret"=>$this->getSecret()
-			]);
-			while ($userInfo=$request->fetch()) {
-				continue;
-			}
-		}
-		public function creerLesSessions(){
-			session_start();
-			$_SESSION["pseudo"]=$this->getPseudo();
-			$_SESSION["email"]=$this->getEmail();
-			$_SESSION["password"]=$this->getPassword();
-			$_SESSION["connect"]=1;
-		}
-	}
-
 
 
 ?> 
